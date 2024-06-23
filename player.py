@@ -7,6 +7,7 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         pygame.sprite.Sprite.__init__(self)
         self.image=pygame.image.load('resources/player.png').convert_alpha()
+        self.original_image = self.image.copy()
         self.rect = self.image.get_rect(midbottom=(pos))
         self.speed = speed
         self.max_x_constraint = constraint
@@ -16,6 +17,11 @@ class Player(pygame.sprite.Sprite):
         self.lasers = pygame.sprite.Group()
         self.laser_sound = pygame.mixer.Sound('resources/Sounds_laser.ogg')
         self.laser_sound.set_volume(0.2)
+        self.playerhit = pygame.image.load('resources/playerhit.png').convert_alpha()
+        self.hit = False
+        self.hit_time = 0
+        self.hit_duration = 1000
+        self.blink_interval = 100
 
     def get_input(self):
         keys = pygame.key.get_pressed()
@@ -47,9 +53,25 @@ class Player(pygame.sprite.Sprite):
     def reset(self):
         self.rect = self.image.get_rect(midbottom=(screen_widht/2, screen_height))
         self.lasers.empty()
+    def got_hit(self):
+        self.image = self.playerhit
+        self.hit = True
+        self.hit_time = pygame.time.get_ticks()
+        self.blink_start_time = self.hit_time
 
     def update(self):
         self.get_input()
         self.contraints()
         self.recharge()
         self.lasers.update()
+        if self.hit:
+            current_time = pygame.time.get_ticks()
+            elapsed_time = current_time - self.hit_time
+            if elapsed_time < self.hit_duration:
+                if (current_time - self.blink_start_time) // self.blink_interval % 2 == 0:
+                    self.image = self.playerhit
+                else:
+                    self.image = self.original_image
+            else:
+                self.image = self.original_image
+                self.hit = False
