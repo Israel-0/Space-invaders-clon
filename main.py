@@ -1,7 +1,11 @@
 import pygame
 import sys
 import random
-from objects import Player, Obstacle, grid, Alien, Laser,MisteryShip
+import csv
+from player import Player
+from laser import Laser
+from aliens import Alien, MisteryShip
+from obstacles import Obstacle, grid
 from screen import screen_widht, screen_height
 
 pygame.init()
@@ -9,6 +13,8 @@ screen = pygame.display.set_mode((screen_widht, screen_height))
 pygame.display.set_caption('Space Invaders')
 pygame_icon = pygame.image.load('resources/green.png')
 pygame.display.set_icon(pygame_icon)
+font = pygame.font.Font('resources/monogram.ttf', 30)
+white = (255, 255, 255)
 
 SHOOT_LASER = pygame.USEREVENT
 pygame.time.set_timer(SHOOT_LASER,500)
@@ -22,11 +28,21 @@ class Game:
         self.obstacles = self.create_obstacles()
         self.aliens_group = pygame.sprite.Group()
         self.create_aliens()
+        self.aliens_speed = 1
         self.aliens_direction = 1
         self.lasers_aliens = pygame.sprite.Group()
         self.misteryship = pygame.sprite.GroupSingle()
         self.lives = 3
         self.running = True
+        self.round = 1
+        self.score = 0
+        self.highscore = self.read_highscore()
+        self.interface_height = 40
+        self.explosion_sound = pygame.mixer.Sound('resources/Sounds_explosion.ogg')
+        self.explosion_sound.set_volume(0.1)
+        pygame.mixer.music.load('resources/Sounds_music.ogg')
+        pygame.mixer.music.set_volume(0.1)
+        pygame.mixer_music.play(-1)
 
     def create_obstacles(self):
         obtacles_width = len(grid[0]) * 3
@@ -57,7 +73,7 @@ class Game:
 
     def move_aliens(self):
         for alien in self.aliens_group:
-            alien.update(self.aliens_direction)
+            alien.update(self.aliens_direction * self.aliens_speed)
         self.alien_sprites = self.aliens_group
         for alien in self.alien_sprites:
             if alien.rect.right >= screen_widht:
@@ -82,11 +98,23 @@ class Game:
         if self.player_sprite.lasers:
             for laser in self.player_sprite.lasers:
                 collided_aliens = pygame.sprite.spritecollide(laser, self.aliens_group, False)
+                if laser.rect.top < self.interface_height:
+                    laser.kill()
                 if collided_aliens:
                     for alien in collided_aliens:
                         alien.explode()
+                        self.explosion_sound.play()
+                        if alien.type == 'green':
+                            self.score += 30
+                        elif alien.type == 'yellow':
+                            self.score += 20
+                        else:
+                            self.score += 10
                     laser.kill()
-                if pygame.sprite.spritecollide(laser,self.misteryship,True):
+                if pygame.sprite.spritecollide(laser,self.misteryship,False):
+                    self.score += 100
+                    self.misteryship.sprite.explode()
+                    self.explosion_sound.play()
                     laser.kill()
                 for obstacle in self.obstacles:
                     if pygame.sprite.spritecollide(laser,obstacle.blocks_group,True):
@@ -99,6 +127,7 @@ class Game:
                     if self.lives == 0:
                         self.game_over()
                 if pygame.sprite.spritecollide(laser,self.player_sprite.lasers,True):
+                    self.explosion_sound.play()
                     laser.kill()
                 for obstacle in self.obstacles:
                     if pygame.sprite.spritecollide(laser,obstacle.blocks_group,True):
@@ -112,16 +141,60 @@ class Game:
 
     def game_over(self):
         self.running = False
+        if self.score > self.highscore:
+            self.highscore = self.score
+            self.write_highscore()
 
     def reset(self):
         self.running = True
         self.lives = 3
+        self.round = 1
+        self.aliens_speed = 1
+        self.score = 0
         self.player_sprite.reset()
         self.aliens_group.empty()
         self.lasers_aliens.empty()
         self.create_aliens()
         self.misteryship.empty()
         self.obstacles = self.create_obstacles()
+    def round_up(self):
+        if self.running == True and len(self.aliens_group) == 0 and len(self.misteryship) == 0:
+            self.player_sprite.reset()
+            self.lasers_aliens.empty()
+            self.round += 1
+            self.create_aliens()
+            self.aliens_speed += 0.2
+
+    def draw_interface(self):
+        score_text = font.render(f'Score: {self.score}', True, white)
+        highscore_text = font.render(f'Highscore: {self.highscore}', True, white)
+        lives_text = font.render(f'Lives: {self.lives}', True, white)
+        round_text = font.render(f'Round: {self.round}', True, white)
+        game_over = font.render(f'You got {self.score} points in {self.round} rounds (Press ENTER to play again)', True, white)
+
+        if self.running == True:
+            screen.blit(score_text, (10, 10))
+            screen.blit(highscore_text, ((screen_widht/2) -200, 10))
+            screen.blit(lives_text, (screen_widht - 100, 10))
+            screen.blit(round_text, (screen_widht - 220, 10))
+        else:
+            game_over_rect = game_over.get_rect(center=(screen_widht / 2, self.interface_height / 2))
+            screen.blit(game_over, game_over_rect.topleft)
+
+        pygame.draw.line(screen, white, (0, self.interface_height), (screen_widht, self.interface_height), 2)
+    def read_highscore(self):
+        try:
+            with open('highscore.csv', mode='r') as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    return int(row[0])
+        except FileNotFoundError:
+            return 0
+
+    def write_highscore(self):
+        with open('highscore.csv', mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([self.highscore])
 
     def run(self):
 
@@ -133,7 +206,9 @@ class Game:
         self.lasers_aliens.draw(screen)
         self.misteryship.draw(screen)
         self.check_for_collisions()
+        self.draw_interface()
         if self.running == True:
+            self.round_up()
             self.misteryship.update()
             self.lasers_aliens.update()
             self.player.update()
