@@ -124,6 +124,7 @@ class Game:
                 if pygame.sprite.spritecollide(laser,self.player,False):
                     laser.kill()
                     self.lives -= 1
+                    self.player_sprite.got_hit()
                     if self.lives == 0:
                         self.game_over()
                 if pygame.sprite.spritecollide(laser,self.player_sprite.lasers,True):
