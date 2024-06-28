@@ -1,5 +1,5 @@
 import pygame
-from screen import screen_height
+screen_height = 764
 
 class Laser(pygame.sprite.Sprite):
     def __init__(self,pos,speed = 5):

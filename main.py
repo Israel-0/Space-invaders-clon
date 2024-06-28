@@ -6,7 +6,8 @@ from player import Player
 from laser import Laser
 from aliens import Alien, MisteryShip
 from obstacles import Obstacle, grid
-from screen import screen_widht, screen_height
+screen_widht = 768
+screen_height = 764
 
 pygame.init()
 screen = pygame.display.set_mode((screen_widht, screen_height))
